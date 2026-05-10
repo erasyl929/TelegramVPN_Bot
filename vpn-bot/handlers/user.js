@@ -3,69 +3,100 @@ const db = require('../db');
 const marzban = require('../marzban');
 const { createPendingPayment } = require('../payments');
 
+function generateRefCode(telegramId) {
+  return `ref_${telegramId}_${Math.random().toString(36).substr(2, 5)}`;
+}
+
+function fillTemplate(template, vars) {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] || '');
+}
+
 function register(bot) {
 
-  // /start
-  bot.onText(/\/start/, async (msg) => {
-  const id = msg.from.id;
-  const name = msg.from.first_name || 'друг';
-  const username = msg.from.username || null;
+  bot.onText(/\/start(.*)/, async (msg, match) => {
+    const id = msg.from.id;
+    const username = msg.from.username || null;
+    const firstName = msg.from.first_name || 'друг';
+    const refArg = match[1].trim();
 
-  // Сохраняем пользователя в MongoDB
-  await db.registerUser(id, username, name);
+    await db.registerUser(id, username, firstName);
+
+    let user = await db.getUser(id);
+
+    if (refArg && refArg.startsWith('ref_') && !user.referred_by) {
+      const referrer = await db.getUserByReferralCode(refArg);
+      if (referrer && referrer.telegram_id !== id) {
+        await db.addBonusDays(referrer.telegram_id, 7);
+        await db.addBonusDays(id, 3);
+        await bot.sendMessage(referrer.telegram_id,
+          '🎁 По твоей реферальной ссылке зарегистрировался новый пользователь!\n+7 дней бонуса начислено.'
+        ).catch(() => {});
+      }
+    }
+
+    if (!user.referral_code) {
+      await db.setReferralCode(id, generateRefCode(id));
+    }
+
+    const msgTemplate = await db.getMessage('msg_start');
+    const text = fillTemplate(msgTemplate, { name: firstName });
 
     const keyboard = {
       reply_markup: {
         keyboard: [
           ['🔑 Мой VPN', '💳 Купить VPN'],
-          ['📊 Тарифы', '❓ Помощь']
+          ['📊 Тарифы', '💰 История платежей'],
+          ['🎁 Реферальная программа', '❓ Помощь']
         ],
         resize_keyboard: true
       }
     };
 
-    await bot.sendMessage(id,
-      `👋 Привет, ${name}!\n\nЯ помогу тебе купить VPN.\n\nВыбери действие:`,
-      keyboard
-    );
+    await bot.sendMessage(id, text, keyboard);
   });
 
-  // Тарифы
   bot.onText(/📊 Тарифы|\/plans/, async (msg) => {
     const id = msg.from.id;
+    const plans = await db.getPlans();
     let text = '📦 *Доступные тарифы:*\n\n';
-    for (const [key, plan] of Object.entries(config.PLANS)) {
+    for (const plan of Object.values(plans)) {
       text += `• *${plan.label}* — ${plan.price} TON\n`;
     }
-    text += `\nТрафик: ${config.TRAFFIC_LIMIT_GB > 0 ? config.TRAFFIC_LIMIT_GB + ' ГБ' : 'Безлимит'}\n`;
+    const limit = await db.getTrafficLimit();
+    text += `\nТрафик: ${limit > 0 ? limit + ' ГБ' : 'Безлимит'}\n`;
     text += `\nНажми *💳 Купить VPN* чтобы оформить подписку.`;
     await bot.sendMessage(id, text, { parse_mode: 'Markdown' });
   });
 
-  // Купить VPN
   bot.onText(/💳 Купить VPN|\/buy/, async (msg) => {
     const id = msg.from.id;
+    const user = await db.getUser(id);
+    const plans = await db.getPlans();
 
-    const buttons = Object.entries(config.PLANS).map(([key, plan]) => ([{
+    const buttons = Object.entries(plans).map(([key, plan]) => ([{
       text: `${plan.label} — ${plan.price} TON`,
       callback_data: `buy_${key}`
     }]));
 
-    await bot.sendMessage(id, '💳 *Выбери тариф:*', {
+    const msgTemplate = await db.getMessage('msg_buy');
+    let text = msgTemplate;
+    if (user && user.bonus_days > 0) {
+      text += `\n\n🎁 У тебя есть *${user.bonus_days} бонусных дней*!`;
+    }
+
+    await bot.sendMessage(id, text, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: buttons }
     });
   });
 
-  // Мой VPN
   bot.onText(/🔑 Мой VPN|\/myvpn/, async (msg) => {
     const id = msg.from.id;
-    const user = db.getUser(id);
+    const user = await db.getUser(id);
 
     if (!user || !user.marzban_username) {
-      return bot.sendMessage(id, '❌ У тебя ещё нет активной подписки.\n\nНажми *💳 Купить VPN*', {
-        parse_mode: 'Markdown'
-      });
+      const text = await db.getMessage('msg_novpn');
+      return bot.sendMessage(id, text, { parse_mode: 'Markdown' });
     }
 
     const mUser = await marzban.getUser(user.marzban_username);
@@ -78,79 +109,148 @@ function register(bot) {
       : 'Не ограничено';
 
     const usedGB = ((mUser.used_traffic || 0) / 1e9).toFixed(2);
-    const limitGB = mUser.data_limit > 0
-      ? (mUser.data_limit / 1e9).toFixed(0) + ' ГБ'
-      : 'Безлимит';
-
-    const subUrl = marzban.getSubscriptionUrl(user.marzban_username);
+    const limitGB = mUser.data_limit > 0 ? (mUser.data_limit / 1e9).toFixed(0) + ' ГБ' : 'Безлимит';
+    const links = await marzban.getUserLinks(user.marzban_username);
+    const configText = links.length > 0 ? links[0] : 'Нет конфига';
 
     const text = `🔑 *Твой VPN*\n\n` +
       `📅 Действует до: *${expireDate}*\n` +
       `📊 Использовано: *${usedGB} ГБ* из ${limitGB}\n` +
-      `🔴 Статус: *${mUser.status === 'active' ? '✅ Активен' : '❌ ' + mUser.status}*\n\n` +
-      `🔗 Ссылка подписки:\n\`${subUrl}\`\n\n` +
-      `_Добавь эту ссылку в Happ/V2rayNG_`;
+      `✅ Статус: *${mUser.status === 'active' ? 'Активен' : mUser.status}*\n\n` +
+      `🔗 *Конфиг:*\n\`${configText}\`\n\n` +
+      `_Импортируй конфиг в Happ или V2rayNG_`;
 
     await bot.sendMessage(id, text, {
       parse_mode: 'Markdown',
       reply_markup: {
-        inline_keyboard: [[
-          { text: '🔄 Продлить', callback_data: 'extend' }
-        ]]
+        inline_keyboard: [
+          [{ text: '🔄 Продлить', callback_data: 'extend' }],
+          [{ text: '📱 Инструкция', callback_data: 'instruction' }]
+        ]
       }
     });
   });
 
-  // Помощь
-  bot.onText(/❓ Помощь|\/help/, async (msg) => {
-    await bot.sendMessage(msg.from.id,
-      `❓ *Помощь*\n\n` +
-      `1. Купи VPN через *💳 Купить VPN*\n` +
-      `2. Оплати в TON по инструкции\n` +
-      `3. После оплаты получишь ссылку подписки\n` +
-      `4. Добавь ссылку в приложение (Happ, V2rayNG, Streisand)\n\n` +
-      `По вопросам: @your_support_username`,
+  bot.onText(/💰 История платежей|\/history/, async (msg) => {
+    const id = msg.from.id;
+    const payments = await db.getUserPayments(id);
+    const plans = await db.getPlans();
+
+    if (!payments || payments.length === 0) {
+      return bot.sendMessage(id, '📭 У тебя пока нет оплаченных подписок.');
+    }
+
+    let text = `💰 *История платежей:*\n\n`;
+    for (const p of payments.slice(0, 10)) {
+      const date = new Date(p.paid_at).toLocaleDateString('ru-RU');
+      const plan = plans[p.plan];
+      text += `• ${date} — ${plan ? plan.label : p.plan} — ${p.amount_ton} TON\n`;
+    }
+
+    await bot.sendMessage(id, text, { parse_mode: 'Markdown' });
+  });
+
+  bot.onText(/🎁 Реферальная программа|\/ref/, async (msg) => {
+    const id = msg.from.id;
+    let user = await db.getUser(id);
+
+    if (!user.referral_code) {
+      await db.setReferralCode(id, generateRefCode(id));
+      user = await db.getUser(id);
+    }
+
+    const botInfo = await bot.getMe();
+    const refLink = `https://t.me/${botInfo.username}?start=${user.referral_code}`;
+
+    await bot.sendMessage(id,
+      `🎁 *Реферальная программа*\n\n` +
+      `За каждого друга: *+7 дней* тебе, *+3 дня* другу\n\n` +
+      `🔗 Твоя ссылка:\n\`${refLink}\`\n\n` +
+      `💎 Бонусных дней: *${user.bonus_days || 0}*`,
       { parse_mode: 'Markdown' }
     );
   });
 
-  // Callback: выбор тарифа
+  bot.onText(/❓ Помощь|\/help/, async (msg) => {
+    const text = await db.getMessage('msg_help');
+    await bot.sendMessage(msg.from.id, text, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{ text: '💬 Написать в поддержку', callback_data: 'support' }]]
+      }
+    });
+  });
+
   bot.on('callback_query', async (query) => {
     const id = query.from.id;
     const data = query.data;
 
     if (data.startsWith('buy_')) {
       const planKey = data.replace('buy_', '');
-      const plan = config.PLANS[planKey];
+      const plans = await db.getPlans();
+      const plan = plans[planKey];
       if (!plan) return;
 
       const payment = await createPendingPayment(id, planKey);
-
-      const text =
-        `💳 *Оплата ${plan.label}*\n\n` +
-        `Сумма: *${plan.price} TON*\n\n` +
-        `Отправь точно *${plan.price} TON* на кошелёк:\n` +
-        `\`${payment.wallet}\`\n\n` +
-        `⚠️ *Обязательно укажи комментарий:*\n` +
-        `\`${payment.comment}\`\n\n` +
-        `_Платёж проверяется автоматически каждые 2 минуты._\n` +
-        `_Срок оплаты: 24 часа._`;
+      const msgTemplate = await db.getMessage('msg_payment');
+      const text = fillTemplate(msgTemplate, {
+        plan: plan.label,
+        amount: plan.price,
+        wallet: payment.wallet,
+        comment: payment.comment
+      });
 
       await bot.answerCallbackQuery(query.id);
       await bot.sendMessage(id, text, { parse_mode: 'Markdown' });
     }
 
     if (data === 'extend') {
+      const plans = await db.getPlans();
       await bot.answerCallbackQuery(query.id);
-      await bot.sendMessage(id, '💳 Выбери новый тариф для продления:', {
+      await bot.sendMessage(id, '💳 Выбери тариф для продления:', {
         reply_markup: {
-          inline_keyboard: Object.entries(config.PLANS).map(([key, plan]) => ([{
+          inline_keyboard: Object.entries(plans).map(([key, plan]) => ([{
             text: `${plan.label} — ${plan.price} TON`,
             callback_data: `buy_${key}`
           }]))
         }
       });
     }
+
+    if (data === 'instruction') {
+      await bot.answerCallbackQuery(query.id);
+      await bot.sendMessage(id,
+        `📱 *Инструкция по подключению*\n\n` +
+        `*Android:* Happ или V2rayNG → + → Import from clipboard\n\n` +
+        `*iOS:* Streisand или Shadowrocket → + → Import\n\n` +
+        `*Windows:* Hiddify → Add profile\n\n` +
+        `*Mac:* FoXray или Hiddify → Import`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    if (data === 'support') {
+      await bot.answerCallbackQuery(query.id);
+      await bot.sendMessage(id, '💬 Напиши свой вопрос:');
+      await db.setSupportMode(id, true);
+    }
+  });
+
+  bot.on('message', async (msg) => {
+    if (!msg.text || msg.text.startsWith('/')) return;
+    const id = msg.from.id;
+    const user = await db.getUser(id);
+    if (!user || !user.support_mode) return;
+
+    for (const adminId of config.ADMIN_IDS) {
+      await bot.sendMessage(adminId,
+        `💬 *Вопрос от пользователя*\nID: \`${id}\`\n${msg.text}\n\nОтветить: /reply ${id} <текст>`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    }
+
+    await bot.sendMessage(id, '✅ Сообщение отправлено! Ответим в ближайшее время.');
+    await db.setSupportMode(id, false);
   });
 }
 

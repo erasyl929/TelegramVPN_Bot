@@ -13,19 +13,14 @@ async function loadPlansFromDB() {
     if (plans) Object.assign(config.PLANS, plans);
     const limit = await db.getTrafficLimit();
     if (limit !== null) config.TRAFFIC_LIMIT_GB = limit;
-    console.log('✅ Тарифы загружены из MongoDB');
   } catch (err) {
-    console.log('⚠️ Используются дефолтные тарифы:', err.message);
+    console.log('⚠️ Дефолтные тарифы:', err.message);
   }
 }
 
 async function main() {
   await db.connect();
-
-  // Загружаем тарифы из базы
   await loadPlansFromDB();
-
-  // Обновляем тарифы каждые 5 минут
   setInterval(loadPlansFromDB, 5 * 60 * 1000);
 
   const bot = new TelegramBot(config.BOT_TOKEN, { polling: true });
@@ -33,7 +28,6 @@ async function main() {
   userHandler.register(bot);
   adminHandler.register(bot);
 
-  // Проверка TON платежей каждые 2 минуты
   async function checkPayments() {
     try {
       const confirmed = await checkTonTransactions();
@@ -47,17 +41,15 @@ async function main() {
         }
       }
     } catch (err) {
-      console.error('Ошибка проверки платежей:', err.message);
+      console.error('Ошибка платежей:', err.message);
     }
   }
 
-  // Обработка рассылок из MongoDB каждую минуту
   async function processBroadcasts() {
     try {
       const broadcasts = await db.getPendingBroadcasts();
       for (const broadcast of broadcasts) {
         await db.markBroadcastDone(broadcast._id);
-
         const allUsers = await db.getAllUsers();
         let targets = allUsers.filter(u => !u.is_banned);
 

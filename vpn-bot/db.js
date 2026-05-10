@@ -5,7 +5,6 @@ async function connect() {
   console.log('✅ MongoDB подключена');
 }
 
-// Схемы
 const userSchema = new mongoose.Schema({
   telegram_id:      { type: Number, required: true, unique: true },
   username:         { type: String, default: null },
@@ -18,7 +17,7 @@ const userSchema = new mongoose.Schema({
   support_mode:     { type: Boolean, default: false },
   notified_3days:   { type: Boolean, default: false },
   created_at:       { type: Date, default: Date.now }
-});
+}, { strict: false });
 
 const paymentSchema = new mongoose.Schema({
   telegram_id: { type: Number, required: true },
@@ -47,7 +46,7 @@ const Payment   = mongoose.model('Payment', paymentSchema);
 const Settings  = mongoose.model('Settings', settingsSchema);
 const Broadcast = mongoose.model('Broadcast', broadcastSchema);
 
-// --- Пользователи ---
+// Пользователи
 async function getUser(telegramId) {
   return User.findOne({ telegram_id: telegramId });
 }
@@ -100,7 +99,7 @@ async function resetNotified3Days(telegramId) {
   return User.findOneAndUpdate({ telegram_id: telegramId }, { notified_3days: false });
 }
 
-// --- Платежи ---
+// Платежи
 async function createPayment(telegramId, plan, amountTon, comment) {
   return Payment.create({ telegram_id: telegramId, plan, amount_ton: amountTon, comment });
 }
@@ -121,7 +120,7 @@ async function getUserPayments(telegramId) {
   return Payment.find({ telegram_id: telegramId, status: 'paid' }).sort({ paid_at: -1 });
 }
 
-// --- Статистика ---
+// Статистика
 async function getStats() {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -135,16 +134,10 @@ async function getStats() {
     Payment.countDocuments({ status: 'paid', paid_at: { $gte: startOfMonth } }),
   ]);
 
-  return {
-    totalUsers,
-    totalPaid,
-    totalRevenue: revenueResult[0]?.total || 0,
-    todayPaid,
-    monthPaid,
-  };
+  return { totalUsers, totalPaid, totalRevenue: revenueResult[0]?.total || 0, todayPaid, monthPaid };
 }
 
-// --- Настройки / Сообщения ---
+// Настройки / Сообщения
 const DEFAULT_MESSAGES = {
   msg_start:    '👋 Привет, {name}!\n\nЯ помогу тебе купить VPN.\n\nВыбери действие:',
   msg_buy:      '💳 *Выбери тариф:*',
@@ -182,7 +175,7 @@ async function getTrafficLimit() {
   return doc ? parseInt(doc.value) : 50;
 }
 
-// --- Рассылки ---
+// Рассылки
 async function getPendingBroadcasts() {
   return Broadcast.find({ status: 'pending' });
 }
