@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<%- include('partials/header', { title: 'Дашборд' }) %>
+<body class="bg-gray-950 text-white">
+  <%- include('partials/sidebar', { page: 'dashboard' }) %>
+
+  <main class="ml-64 p-8">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold">📊 Дашборд</h2>
+      <p class="text-gray-400 mt-1">Общая статистика сервиса</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <div class="text-gray-400 text-sm mb-2">👥 Всего пользователей</div>
+        <div class="text-3xl font-bold text-white"><%= stats.totalUsers || 0 %></div>
+      </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <div class="text-gray-400 text-sm mb-2">💳 Оплат сегодня</div>
+        <div class="text-3xl font-bold text-green-400"><%= stats.todayPaid || 0 %></div>
+      </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <div class="text-gray-400 text-sm mb-2">📆 Оплат в месяце</div>
+        <div class="text-3xl font-bold text-blue-400"><%= stats.monthPaid || 0 %></div>
+      </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <div class="text-gray-400 text-sm mb-2">💰 Общая выручка</div>
+        <div class="text-3xl font-bold text-yellow-400"><%= stats.totalRevenue || '0.00' %> TON</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-800">
+          <h3 class="font-semibold">💳 Последние платежи</h3>
+        </div>
+        <div class="divide-y divide-gray-800">
+          <% if (recentPayments && recentPayments.length > 0) { %>
+            <% recentPayments.forEach(p => { %>
+              <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-800/50 transition">
+                <div>
+                  <div class="text-sm font-medium">ID: <%= p.telegram_id %></div>
+                  <div class="text-xs text-gray-400"><%= p.plan %> · <%= new Date(p.paid_at).toLocaleDateString('ru-RU') %></div>
+                </div>
+                <div class="text-green-400 font-semibold"><%= p.amount_ton %> TON</div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="px-6 py-8 text-center text-gray-500">Платежей пока нет</div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-800">
+          <h3 class="font-semibold">👤 Новые пользователи</h3>
+        </div>
+        <div class="divide-y divide-gray-800">
+          <% if (recentUsers && recentUsers.length > 0) { %>
+            <% recentUsers.forEach(u => { %>
+              <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-800/50 transition">
+                <div class="flex items-center gap-3">
+                  <% if (u.custom_avatar) { %>
+                    <img src="<%= u.custom_avatar %>" class="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                  <% } else { %>
+                    <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                      <%= (u.custom_name || u.first_name || u.username || '?')[0].toUpperCase() %>
+                    </div>
+                  <% } %>
+                  <div>
+                    <div class="text-sm font-medium"><%= u.custom_name || u.first_name || u.username || 'Без имени' %></div>
+                    <div class="text-xs text-gray-400">@<%= u.username || 'нет' %> · <%= u.telegram_id %></div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <% if (u.is_banned) { %>
+                    <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">Бан</span>
+                  <% } else if (u.marzban_username) { %>
+                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">VPN</span>
+                  <% } else { %>
+                    <span class="text-xs bg-gray-700 text-gray-400 px-2 py-1 rounded">Нет VPN</span>
+                  <% } %>
+                  <a href="/users/<%= u.telegram_id %>" class="text-xs text-blue-400 hover:underline">→</a>
+                </div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="px-6 py-8 text-center text-gray-500">Пользователей пока нет</div>
+          <% } %>
+        </div>
+        <div class="px-6 py-3 border-t border-gray-800">
+          <a href="/users" class="text-blue-400 text-sm hover:underline">Все пользователи →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

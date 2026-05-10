@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ru">
+<%- include('partials/header', { title: 'Настройки' }) %>
+<body class="bg-gray-950 text-white">
+  <%- include('partials/sidebar', { page: 'settings' }) %>
+
+  <main class="ml-64 p-8">
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold">⚙️ Настройки</h2>
+      <p class="text-gray-400 mt-1">Тарифы, сообщения бота и рассылки</p>
+    </div>
+
+    <% if (locals.success) { %>
+      <div class="alert alert-success">✅ <%= success %></div>
+    <% } %>
+    <% if (locals.error) { %>
+      <div class="alert alert-error">❌ <%= error %></div>
+    <% } %>
+
+    <!-- Табы -->
+    <div class="flex gap-2 mb-6 border-b border-gray-800">
+      <button onclick="showTab('plans')" id="tab-plans"
+        class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white -mb-px">
+        💰 Тарифы
+      </button>
+      <button onclick="showTab('messages')" id="tab-messages"
+        class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white -mb-px">
+        💬 Сообщения
+      </button>
+      <button onclick="showTab('broadcast')" id="tab-broadcast"
+        class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white -mb-px">
+        📢 Рассылка
+      </button>
+    </div>
+
+    <!-- Тарифы -->
+    <div id="panel-plans" class="hidden">
+      <form action="/settings/plans" method="POST">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <% for (const [key, plan] of Object.entries(plans)) { %>
+            <div class="card p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold"><%= plan.label %></h3>
+                <span class="badge badge-blue text-xs"><%= key %></span>
+              </div>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-gray-400 text-xs mb-1">Название кнопки</label>
+                  <input
+                    type="text"
+                    name="<%= key %>_label"
+                    value="<%= plan.label %>"
+                    class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                    required
+                  />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-gray-400 text-xs mb-1">Цена (TON)</label>
+                    <input
+                      type="number"
+                      name="<%= key %>_price"
+                      value="<%= plan.price %>"
+                      step="0.01"
+                      min="0"
+                      class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-gray-400 text-xs mb-1">Дней</label>
+                    <input
+                      type="number"
+                      name="<%= key %>_days"
+                      value="<%= plan.days %>"
+                      min="1"
+                      class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Лимит трафика -->
+        <div class="card p-6 mb-6">
+          <h3 class="font-semibold mb-4">📊 Лимит трафика</h3>
+          <div class="flex items-center gap-4">
+            <div class="flex-1">
+              <label class="block text-gray-400 text-xs mb-1">Лимит в ГБ (0 = безлимит)</label>
+              <input
+                type="number"
+                name="traffic_limit_gb"
+                value="<%= trafficLimit %>"
+                min="0"
+                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div class="text-gray-500 text-sm mt-4">ГБ на пользователя</div>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button type="submit" class="btn btn-primary">💾 Сохранить тарифы</button>
+          <button type="button" onclick="resetPlans()" class="btn btn-gray">🔄 Сбросить к дефолту</button>
+        </div>
+      </form>
+
+      <form id="reset-plans-form" action="/settings/plans/reset" method="POST" class="hidden"></form>
+    </div>
+
+    <!-- Сообщения бота -->
+    <div id="panel-messages" class="hidden">
+      <form action="/settings/messages" method="POST" class="space-y-6">
+        <% for (const [key, label] of Object.entries(labels)) { %>
+          <div class="card p-6">
+            <div class="flex items-center justify-between mb-3">
+              <label class="font-medium text-sm"><%= label %></label>
+              <form action="/settings/messages/reset/<%= key %>" method="POST" style="display:inline">
+                <button type="submit" class="text-xs text-gray-500 hover:text-red-400 transition"
+                  onclick="return confirm('Сбросить к дефолту?')">
+                  🔄 Сбросить
+                </button>
+              </form>
+            </div>
+            <textarea
+              name="<%= key %>"
+              rows="4"
+              class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 text-sm resize-y font-mono focus:border-blue-500"
+            ><%= messages[key] %></textarea>
+            <% if (key === 'msg_start') { %>
+              <p class="text-gray-500 text-xs mt-1">Переменные: <code>{name}</code></p>
+            <% } else if (key === 'msg_payment') { %>
+              <p class="text-gray-500 text-xs mt-1">Переменные: <code>{plan}</code> <code>{amount}</code> <code>{wallet}</code> <code>{comment}</code></p>
+            <% } else if (key === 'msg_activated') { %>
+              <p class="text-gray-500 text-xs mt-1">Переменные: <code>{expire}</code> <code>{config}</code></p>
+            <% } %>
+          </div>
+        <% } %>
+        <button type="submit" class="btn btn-primary">💾 Сохранить сообщения</button>
+      </form>
+    </div>
+
+    <!-- Рассылка -->
+    <div id="panel-broadcast" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6">
+          <h3 class="font-semibold text-lg mb-4">📢 Новая рассылка</h3>
+          <form action="/settings/broadcast" method="POST" class="space-y-4">
+            <div>
+              <label class="block text-gray-400 text-sm mb-2">Фильтр получателей</label>
+              <select name="filter" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm">
+                <option value="all">👥 Все пользователи</option>
+                <option value="vpn">🔑 Только с VPN</option>
+                <option value="novpn">👤 Без VPN</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-gray-400 text-sm mb-2">Текст сообщения</label>
+              <textarea
+                name="message"
+                rows="8"
+                placeholder="Введите текст...\n\nПоддерживается *жирный*, _курсив_, `код`"
+                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 text-sm resize-none focus:border-blue-500"
+                required
+              ></textarea>
+              <p class="text-gray-500 text-xs mt-1">Markdown: *жирный*, _курсив_, `код`</p>
+            </div>
+            <button type="submit" class="btn btn-primary w-full justify-center">📢 Отправить</button>
+          </form>
+        </div>
+
+        <div class="card p-6">
+          <h3 class="font-semibold text-lg mb-4">ℹ️ Подсказки</h3>
+          <div class="space-y-3 text-sm text-gray-400">
+            <p>• Рассылка отправляется ботом в течение 1 минуты</p>
+            <p>• Заблокированным не отправляется</p>
+            <p>• Фильтр <strong class="text-white">«С VPN»</strong> — у кого есть подписка</p>
+            <p>• Фильтр <strong class="text-white">«Без VPN»</strong> — кто ещё не купил</p>
+          </div>
+          <div class="mt-6 space-y-2">
+            <a href="/users?filter=vpn" class="btn btn-gray w-full justify-center">🔑 С VPN</a>
+            <a href="/users?filter=novpn" class="btn btn-gray w-full justify-center">👤 Без VPN</a>
+            <a href="/users?filter=banned" class="btn btn-danger w-full justify-center">🚫 Забаненные</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function showTab(tab) {
+      ['plans','messages','broadcast'].forEach(t => {
+        document.getElementById('panel-' + t).classList.add('hidden');
+        document.getElementById('tab-' + t).className =
+          'px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-white -mb-px';
+      });
+      document.getElementById('panel-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).className =
+        'px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-400 -mb-px';
+    }
+
+    function resetPlans() {
+      if (confirm('Сбросить все тарифы к дефолту?')) {
+        document.getElementById('reset-plans-form').submit();
+      }
+    }
+
+    // Открыть нужный таб по якорю
+    const hash = window.location.hash.replace('#','');
+    if (['plans','messages','broadcast'].includes(hash)) {
+      showTab(hash);
+    } else {
+      showTab('plans');
+    }
+  </script>
+</body>
+</html>

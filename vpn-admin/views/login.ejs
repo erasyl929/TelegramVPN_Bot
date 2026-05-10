@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VPN Admin — Вход</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center">
+  <div class="w-full max-w-md">
+    <div class="bg-gray-900 rounded-2xl shadow-2xl p-8 border border-gray-800">
+      <div class="text-center mb-8">
+        <div class="text-5xl mb-4">⚡</div>
+        <h1 class="text-white text-2xl font-bold">VPN Admin</h1>
+        <p class="text-gray-400 mt-2">Войдите в панель управления</p>
+      </div>
+
+      <% if (error) { %>
+        <div class="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 mb-6 text-sm">
+          ❌ <%= error %>
+        </div>
+      <% } %>
+
+      <form action="/login" method="POST" class="space-y-4">
+        <div>
+          <label class="block text-gray-400 text-sm mb-2">Логин</label>
+          <input
+            type="text"
+            name="username"
+            placeholder="admin"
+            class="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition"
+            required
+          />
+        </div>
+        <div>
+          <label class="block text-gray-400 text-sm mb-2">Пароль</label>
+          <input
+            type="password"
+            name="password"
+            placeholder="••••••••"
+            class="w-full bg-gray-800 text-white border border-gray-700 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg transition mt-2"
+        >
+          Войти →
+        </button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

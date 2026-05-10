@@ -1,0 +1,22 @@
+{
+  "name": "vpn-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^16.2.4",
+    "axios": "^1.16.0",
+    "dotenv": "^17.4.2",
+    "mongoose": "^9.6.1",
+    "node-telegram-bot-api": "^0.67.0",
+    "tonweb": "^0.0.66"
+  }
+}

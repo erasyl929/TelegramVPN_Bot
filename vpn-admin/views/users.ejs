@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<%- include('partials/header', { title: 'Пользователи' }) %>
+<body class="bg-gray-950 text-white">
+  <%- include('partials/sidebar', { page: 'users' }) %>
+
+  <main class="ml-64 p-8">
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h2 class="text-2xl font-bold">👥 Пользователи</h2>
+        <p class="text-gray-400 mt-1">Всего: <%= total %></p>
+      </div>
+    </div>
+
+    <form method="GET" action="/users" class="flex gap-3 mb-6">
+      <input type="text" name="search" value="<%= search %>" placeholder="Поиск по username, имени, ID..." class="flex-1 bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm focus:border-blue-500" />
+      <select name="filter" class="bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2.5 text-sm">
+        <option value="">Все</option>
+        <option value="vpn" <%= filter === 'vpn' ? 'selected' : '' %>>С VPN</option>
+        <option value="novpn" <%= filter === 'novpn' ? 'selected' : '' %>>Без VPN</option>
+        <option value="banned" <%= filter === 'banned' ? 'selected' : '' %>>Забаненные</option>
+      </select>
+      <button type="submit" class="btn btn-primary">🔍 Найти</button>
+      <a href="/users" class="btn btn-gray">Сбросить</a>
+    </form>
+
+    <div class="card overflow-hidden">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b border-gray-800">
+            <th class="text-left px-6 py-4 text-gray-400 text-sm font-medium">Пользователь</th>
+            <th class="text-left px-6 py-4 text-gray-400 text-sm font-medium">Telegram ID</th>
+            <th class="text-left px-6 py-4 text-gray-400 text-sm font-medium">Статус</th>
+            <th class="text-left px-6 py-4 text-gray-400 text-sm font-medium">VPN</th>
+            <th class="text-left px-6 py-4 text-gray-400 text-sm font-medium">Дата</th>
+            <th class="px-6 py-4"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+          <% if (users && users.length > 0) { %>
+            <% users.forEach(u => { %>
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <% if (u.custom_avatar) { %>
+                      <img src="<%= u.custom_avatar %>" class="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    <% } else { %>
+                      <div class="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        <%= (u.custom_name || u.first_name || u.username || '?')[0].toUpperCase() %>
+                      </div>
+                    <% } %>
+                    <div>
+                      <div class="font-medium text-sm"><%= u.custom_name || u.first_name || 'Без имени' %></div>
+                      <div class="text-gray-400 text-xs">@<%= u.username || 'нет' %></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-300"><%= u.telegram_id %></td>
+                <td class="px-6 py-4">
+                  <% if (u.is_banned) { %>
+                    <span class="badge badge-red">🚫 Бан</span>
+                  <% } else { %>
+                    <span class="badge badge-green">✅ Активен</span>
+                  <% } %>
+                </td>
+                <td class="px-6 py-4">
+                  <% if (u.marzban_username) { %>
+                    <span class="badge badge-blue">🔑 Есть</span>
+                  <% } else { %>
+                    <span class="badge badge-gray">Нет</span>
+                  <% } %>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-400">
+                  <%= new Date(u.created_at).toLocaleDateString('ru-RU') %>
+                </td>
+                <td class="px-6 py-4">
+                  <a href="/users/<%= u.telegram_id %>" class="text-blue-400 text-sm hover:underline">Открыть →</a>
+                </td>
+              </tr>
+            <% }) %>
+          <% } else { %>
+            <tr>
+              <td colspan="6" class="px-6 py-12 text-center text-gray-500">Пользователи не найдены</td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (pages > 1) { %>
+      <div class="flex gap-2 mt-6 justify-center">
+        <% for (let i = 1; i <= pages; i++) { %>
+          <a href="/users?page=<%= i %>&search=<%= search %>&filter=<%= filter %>" class="px-4 py-2 rounded-lg text-sm <%= page === i ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700' %>">
+            <%= i %>
+          </a>
+        <% } %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

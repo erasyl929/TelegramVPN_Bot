@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<%- include('partials/header', { title: 'Пользователь' }) %>
+<body class="bg-gray-950 text-white">
+  <%- include('partials/sidebar', { page: 'users' }) %>
+
+  <main class="ml-64 p-8">
+    <div class="mb-6">
+      <a href="/users" class="text-gray-400 hover:text-white text-sm">← Назад к пользователям</a>
+    </div>
+
+    <% if (locals.success) { %>
+      <div class="alert alert-success">✅ <%= success %></div>
+    <% } %>
+    <% if (locals.error) { %>
+      <div class="alert alert-error">❌ <%= error %></div>
+    <% } %>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Левая колонка -->
+      <div class="lg:col-span-1 space-y-6">
+
+        <!-- Профиль -->
+        <div class="card p-6">
+          <div class="flex flex-col items-center text-center mb-6">
+            <!-- Аватарка -->
+            <div class="relative mb-4">
+              <% if (user.custom_avatar) { %>
+                <img src="<%= user.custom_avatar %>" class="w-20 h-20 rounded-full object-cover border-2 border-blue-500" />
+              <% } else { %>
+                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold">
+                  <%= (user.custom_name || user.first_name || user.username || '?')[0].toUpperCase() %>
+                </div>
+              <% } %>
+            </div>
+
+            <h2 class="text-xl font-bold"><%= user.custom_name || user.first_name || 'Без имени' %></h2>
+            <% if (user.custom_name && user.first_name) { %>
+              <p class="text-gray-500 text-xs">Telegram: <%= user.first_name %></p>
+            <% } %>
+            <p class="text-gray-400">@<%= user.username || 'нет' %></p>
+            <div class="mt-2">
+              <% if (user.is_banned) { %>
+                <span class="badge badge-red">🚫 Заблокирован</span>
+              <% } else { %>
+                <span class="badge badge-green">✅ Активен</span>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Telegram ID</span>
+              <span class="font-mono"><%= user.telegram_id %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Бонусных дней</span>
+              <span class="text-yellow-400"><%= user.bonus_days || 0 %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Реферал от</span>
+              <span><%= user.referred_by || 'Нет' %></span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Регистрация</span>
+              <span><%= new Date(user.created_at).toLocaleDateString('ru-RU') %></span>
+            </div>
+          </div>
+
+          <% if (user.admin_note) { %>
+            <div class="mt-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+              <div class="text-yellow-400 text-xs font-medium mb-1">📝 Заметка</div>
+              <div class="text-gray-300 text-sm"><%= user.admin_note %></div>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Редактирование -->
+        <div class="card p-6">
+          <h3 class="font-semibold mb-4">✏️ Редактировать</h3>
+          <form action="/users/<%= user.telegram_id %>/edit" method="POST" enctype="multipart/form-data" class="space-y-4">
+            <div>
+              <label class="block text-gray-400 text-xs mb-1">Кастомное имя</label>
+              <input
+                type="text"
+                name="custom_name"
+                value="<%= user.custom_name || '' %>"
+                placeholder="<%= user.first_name || 'Имя' %>"
+                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-gray-400 text-xs mb-1">Заметка админа</label>
+              <textarea
+                name="admin_note"
+                rows="3"
+                placeholder="Заметки о пользователе..."
+                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm resize-none"
+              ><%= user.admin_note || '' %></textarea>
+            </div>
+            <div>
+              <label class="block text-gray-400 text-xs mb-2">Аватарка (макс. 2MB)</label>
+              <input
+                type="file"
+                name="avatar"
+                accept="image/*"
+                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs cursor-pointer"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary w-full justify-center">💾 Сохранить</button>
+          </form>
+
+          <% if (user.custom_avatar) { %>
+            <form action="/users/<%= user.telegram_id %>/delete-avatar" method="POST" class="mt-3">
+              <button class="btn btn-danger w-full justify-center text-xs">🗑️ Удалить аватарку</button>
+            </form>
+          <% } %>
+        </div>
+
+        <!-- Действия -->
+        <div class="card p-6 space-y-3">
+          <h3 class="font-semibold mb-4">⚡ Действия</h3>
+
+          <form action="/users/<%= user.telegram_id %>/ban" method="POST">
+            <button class="btn w-full <%= user.is_banned ? 'btn-success' : 'btn-danger' %>">
+              <%= user.is_banned ? '✅ Разблокировать' : '🚫 Заблокировать' %>
+            </button>
+          </form>
+
+          <% if (user.marzban_username) { %>
+            <form action="/users/<%= user.telegram_id %>/extend" method="POST" class="flex gap-2">
+              <select name="days" class="flex-1 bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm">
+                <option value="30">+30 дней</option>
+                <option value="90">+90 дней</option>
+                <option value="180">+180 дней</option>
+                <option value="365">+365 дней</option>
+              </select>
+              <button class="btn btn-primary">Продлить</button>
+            </form>
+
+            <form action="/users/<%= user.telegram_id %>/delete-vpn" method="POST"
+              onsubmit="return confirm('Удалить подписку?')">
+              <button class="btn btn-danger w-full">🗑️ Удалить подписку</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Правая колонка -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- VPN данные -->
+        <div class="card p-6">
+          <h3 class="font-semibold mb-4">🔑 VPN подписка</h3>
+          <% if (marzbanUser) { %>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 mb-1">Статус</div>
+                <div class="font-semibold <%= marzbanUser.status === 'active' ? 'text-green-400' : 'text-red-400' %>">
+                  <%= marzbanUser.status === 'active' ? '✅ Активна' : '❌ ' + marzbanUser.status %>
+                </div>
+              </div>
+              <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 mb-1">Истекает</div>
+                <div class="font-semibold">
+                  <%= marzbanUser.expire ? new Date(marzbanUser.expire * 1000).toLocaleDateString('ru-RU') : 'Бессрочно' %>
+                </div>
+              </div>
+              <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 mb-1">Использовано</div>
+                <div class="font-semibold text-blue-400">
+                  <%= ((marzbanUser.used_traffic || 0) / 1e9).toFixed(2) %> ГБ
+                </div>
+              </div>
+              <div class="bg-gray-800 rounded-lg p-4">
+                <div class="text-gray-400 mb-1">Лимит</div>
+                <div class="font-semibold">
+                  <%= marzbanUser.data_limit > 0 ? (marzbanUser.data_limit / 1e9).toFixed(0) + ' ГБ' : 'Безлимит' %>
+                </div>
+              </div>
+            </div>
+            <div class="mt-4">
+              <div class="text-gray-400 text-xs mb-1">Marzban username</div>
+              <code class="text-xs bg-gray-800 px-3 py-2 rounded block text-gray-300"><%= user.marzban_username %></code>
+            </div>
+          <% } else { %>
+            <div class="text-center py-8 text-gray-500">
+              <div class="text-4xl mb-2">🔒</div>
+              <p>Подписка не активна</p>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- История платежей -->
+        <div class="card overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-800">
+            <h3 class="font-semibold">💳 История платежей (<%= payments.length %>)</h3>
+          </div>
+          <% if (payments && payments.length > 0) { %>
+            <table class="w-full">
+              <thead>
+                <tr class="border-b border-gray-800">
+                  <th class="text-left px-6 py-3 text-gray-400 text-xs">Дата</th>
+                  <th class="text-left px-6 py-3 text-gray-400 text-xs">Тариф</th>
+                  <th class="text-left px-6 py-3 text-gray-400 text-xs">Сумма</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-800">
+                <% payments.forEach(p => { %>
+                  <tr>
+                    <td class="px-6 py-3 text-sm text-gray-300"><%= new Date(p.paid_at).toLocaleDateString('ru-RU') %></td>
+                    <td class="px-6 py-3 text-sm"><span class="badge badge-blue"><%= p.plan %></span></td>
+                    <td class="px-6 py-3 text-sm text-green-400 font-semibold"><%= p.amount_ton %> TON</td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } else { %>
+            <div class="px-6 py-8 text-center text-gray-500">Платежей нет</div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
